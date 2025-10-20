@@ -1,4 +1,41 @@
 node_modules/
 
-config.js
+# Logs
+logs
+*.log
+npm-debug.log*
+yarn-debug.log*
+yarn-error.log*
+
+# Environment variables
+.env
+.env.local
+.env.development.local
+.env.test.local
+.env.production.local
+
+# Build output
+dist/
+build/
+coverage/
+.tmp/
+
+# OS files
+.DS_Store
+Thumbs.db
+
+# IDE/editor files
+.vscode/
+.idea/
+*.suo
+*.ntvs*
+*.njsproj
+*.sln
+
+# Config files that should not be shared
+config.*
+!config.example.js
+
+# Optional: Ignore old server file if not needed
+oldserver.js
 
