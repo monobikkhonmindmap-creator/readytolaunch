@@ -1,5 +1,5 @@
-// This file will export functions to interact with the 'users' collection
-// using our new flexible auth schema.
+// models/User.js
+// This file exports functions to interact with the 'users' collection.
 
 /**
  * Finds a user by their email address.
@@ -9,8 +9,8 @@
 export async function findUserByEmail(email) {
   if (!global.db) throw new Error("Database not connected.");
   // Find a user where the nested 'email' field matches
-  return global.db.collection('users').findOne({ 
-    "authMethods.email": email.toLowerCase() 
+  return global.db.collection('users').findOne({
+    "authMethods.email": email.toLowerCase()
   });
 }
 
@@ -21,20 +21,21 @@ export async function findUserByEmail(email) {
  * @param {string} grade - The user's grade (e.g., "HSC")
  * @returns {Promise<string>} The inserted user's ID.
  */
-export async function createUserWithEmail(email, hashedPassword, grade) { // <-- Added 'grade'
+export async function createUserWithEmail(email, hashedPassword, grade) {
   if (!global.db) throw new Error("Database not connected.");
   
   const newUser = {
     password: hashedPassword,
-    status: "regular", 
-    lastAttempts: [], // For the flashcard repetition logic
-    createdAt: new Date(),
+    status: "regular", // New users start as regular
     
-    // --- NEW FIELDS ADDED ---
-    grade: grade || null, // Stores the user's provided grade
-    test_taken: [],       // Will store an array of test result objects
-                          // e.g., { testId: "botany_mcq", score: 85, date: new Date() }
-    // --- END NEW FIELDS ---
+    // --- THIS IS THE CHANGE ---
+    // lastAttempts: [], // REMOVED
+    progress: {},      // ADDED (Starts empty for the sparse model)
+    // --- END OF CHANGE ---
+
+    createdAt: new Date(),
+    grade: grade || null,
+    test_taken: [], // This field is fine
 
     authMethods: {
       email: email.toLowerCase(),
@@ -47,3 +48,7 @@ export async function createUserWithEmail(email, hashedPassword, grade) { // <--
   const result = await global.db.collection('users').insertOne(newUser);
   return result.insertedId;
 }
+
+// You might also add functions here later like:
+// export async function findUserById(userId) { ... }
+// export async function updateUserStatus(userId, newStatus) { ... }

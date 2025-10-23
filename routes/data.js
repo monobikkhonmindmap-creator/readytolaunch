@@ -5,25 +5,22 @@ import { authenticateToken } from '../middleware/auth.js';
 
 const router = Router();
 
-// --- NEW: GET SUBJECT DECKS (Practice & Test) ---
-// This new endpoint REPLACES the old '/decks'
-// It fetches decks for only one subject, e.g., 'physics1'
+// --- GET SUBJECT DECKS (Unchanged) ---
+// This endpoint is still correct. It sends the LIST of chapters, which is small.
 router.get('/subject/:subjectKey', authenticateToken, (req, res) => {
-  // The subjectKey comes from the URL, e.g., "physics1", "botany"
-  const { subjectKey } = req.params; 
+  const { subjectKey } = req.params; // e.g., "physics1", "botany"
   console.log(`Controller: getDecks for subject "${subjectKey}"`);
   
   const practiceDecks = [];
   const testDecks = [];
 
   try {
-    // 1. Get the practice decks for this subject (e.g., 'physics1')
     const practiceKey = subjectKey;
     if (global.flashcardCache[practiceKey]) {
       const deckCollection = global.flashcardCache[practiceKey].decks;
       deckCollection.forEach(deck => {
         practiceDecks.push({
-          id: `${practiceKey}-${deck.id}`, // e.g., "physics1-1"
+          id: `${practiceKey}-${deck.id}`,
           title: deck.title,
           totalCards: deck.cards.length,
           accessibility: deck.accessibility || 'regular'
@@ -31,13 +28,12 @@ router.get('/subject/:subjectKey', authenticateToken, (req, res) => {
       });
     }
 
-    // 2. Get the test (MCQ) decks for this subject (e.g., 'physics1_mcq')
     const testKey = `${subjectKey}_mcq`;
     if (global.flashcardCache[testKey]) {
       const deckCollection = global.flashcardCache[testKey].decks;
       deckCollection.forEach(deck => {
         testDecks.push({
-          id: `${testKey}-${deck.id}`, // e.g., "physics1_mcq-1"
+          id: `${testKey}-${deck.id}`,
           title: deck.title,
           totalCards: deck.cards.length,
           accessibility: deck.accessibility || 'regular'
@@ -45,7 +41,6 @@ router.get('/subject/:subjectKey', authenticateToken, (req, res) => {
       });
     }
 
-    // 3. Send both lists back
     res.status(200).json({ practiceDecks, testDecks });
 
   } catch (error) {
@@ -55,22 +50,22 @@ router.get('/subject/:subjectKey', authenticateToken, (req, res) => {
 });
 
 
-// --- KEPT: GET DECK BY ID (This logic is still perfect) ---
-// This endpoint is unchanged. It's used by the StudyScreen.
+// --- UPDATED: GET DECK BY ID (Pagination REMOVED) ---
+// This endpoint now sends the FULL deck (e.g., 2MB) for the app to cache.
 router.get('/deck/:deckId', authenticateToken, (req, res) => {
-  const { deckId } = req.params; // e.g., "botany-1" or "physics1_mcq-2"
+  const { deckId } = req.params; 
   const userStatus = req.user.status; 
 
   try {
+    // 1. Parse the deckId
     const parts = deckId.split('-');
     if (parts.length < 2) {
       return res.status(400).json({ message: "Invalid deck ID format." });
     }
-    
-    // This logic works for both 'physics1-1' and 'physics1_mcq-1'
-    const cacheKey = parts.slice(0, -1).join('-'); // e.g., "physics1" or "physics1_mcq"
+    const cacheKey = parts.slice(0, -1).join('-'); // e.g., "physics1"
     const idInFile = parseInt(parts[parts.length - 1], 10);
 
+    // 2. Find the deck in the cache
     if (!global.flashcardCache[cacheKey]) {
       return res.status(404).json({ message: "Deck collection not found" });
     }
@@ -79,6 +74,7 @@ router.get('/deck/:deckId', authenticateToken, (req, res) => {
       return res.status(404).json({ message: "Deck not found" });
     }
 
+    // 3. CHECK PERMISSION (This logic is still correct)
     const accessLevel = deck.accessibility || 'regular';
     if (accessLevel === 'premium' && userStatus === 'regular') {
       console.log(`Access DENIED for deck "${deckId}" - User is "regular"`);
@@ -88,11 +84,13 @@ router.get('/deck/:deckId', authenticateToken, (req, res) => {
     }
 
     console.log(`Access GRANTED for deck "${deckId}"`);
+
+    // 4. Send the FULL DECK (not paginated)
     res.status(200).json({
       id: deckId,
       title: deck.title,
       type: cacheKey.includes('_mcq') ? 'test' : 'practice',
-      cards: deck.cards 
+      cards: deck.cards // Send the complete cards array
     });
 
   } catch (error) {
@@ -102,24 +100,29 @@ router.get('/deck/:deckId', authenticateToken, (req, res) => {
 });
 
 
-// --- KEPT: SYNC PROGRESS ENDPOINT (Unchanged) ---
+// --- REWRITTEN: SYNC PROGRESS ENDPOINT ---
+// This endpoint now supports the new "sparse" progress model
 router.post('/sync-progress', authenticateToken, async (req, res) => {
   try {
     const userId = req.user.userId;
-    const { lastAttempts, test_taken } = req.body;
+    
+    // The app will send a body like:
+    // { "updates": { "physics1-1": { "attempts": 10, "successes": 3 } } }
+    const { updates } = req.body;
 
-    if (!lastAttempts && !test_taken) {
+    if (!updates || Object.keys(updates).length === 0) {
       return res.status(400).json({ message: "No progress data provided." });
     }
 
+    // Build the MongoDB update operation using "dot notation"
+    // This is the magic that solves your 512MB limit.
     const updateOperation = { $set: {} };
-    if (lastAttempts) {
-      updateOperation.$set.lastAttempts = lastAttempts; 
-    }
-    if (test_taken) {
-      updateOperation.$set.test_taken = test_taken;
+    for (const cardId in updates) {
+      // This creates a key like: "progress.physics1-1"
+      updateOperation.$set[`progress.${cardId}`] = updates[cardId];
     }
     
+    // Update only the specific fields in the user's "progress" object
     await global.db.collection('users').updateOne(
       { _id: new ObjectId(userId) },
       updateOperation
