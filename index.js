@@ -22,9 +22,10 @@ async function startServer() {
   const app = express();
 
   // 3. Apply global middleware
+  // Correct Order
   app.use(cors());
-  app.use(express.urlencoded({ extended: true })); // For aamarpay IPN
-  app.use(express.json()); // For all other JSON requests
+  app.use(express.json());                         // <-- JSON parsing FIRST
+  app.use(express.urlencoded({ extended: true }));
 
   // 4. Use the routers
   app.use(authRoutes);     // Handles /register, /login

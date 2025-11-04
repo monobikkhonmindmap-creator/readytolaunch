@@ -6,7 +6,7 @@ export const AAMARPAY_SIGNATURE_KEY = "dbb74894e82415a2f7ff0ec3a97e4183";
 export const AAMARPAY_API_URL = "https://sandbox.aamarpay.com/jsonpost.php";
 
 // ❗️ Change this to your public URL (from ngrok or later, OCI)
-export const SERVER_BASE_URL = "https://your-codespace-url.com"; 
+export const SERVER_BASE_URL = "https://claimless-rhona-excitable.ngrok-free.dev"; 
 
 // This was the missing secret for your tokens!
 export const JWT_SECRET = "a-very-strong-secret-key-for-development";
